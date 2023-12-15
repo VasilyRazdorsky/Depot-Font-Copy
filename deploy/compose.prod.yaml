@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  depot-front:
+    image: gitlab.rtuitlab.dev:5050/depot/front:latest
+    deploy:
+      placement:
+        preferences:
+          - spread: worker
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 20M
+    logging:
+      driver: json-file
+      options:
+        max-size: '100k'
+        max-file: '2'
+    networks:
+      - net
+
+networks:
+  net:
+    driver: overlay

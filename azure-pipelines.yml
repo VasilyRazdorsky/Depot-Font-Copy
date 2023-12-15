@@ -1,0 +1,108 @@
+trigger:
+  branches:
+    include:
+      - "*"
+  tags:
+    include:
+      - "*"
+
+name: $(BuildID)-$(Build.SourceBranchName)
+
+pool: PublicBuilds
+
+variables:
+  docker_file_path: deploy/Dockerfile
+  docker_build_context: '.'
+  ${{ if notIn(variables['Build.SourceBranch'], 'refs/heads/main', 'refs/tags/develop') }}:
+    deploy_service: false
+    docker_image_tag: test-depot-front
+    docker_registry_host: no
+    docker_image_name: no
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/tags/develop') }}:
+    deploy_service: true
+    docker_image_tag: develop
+    docker_registry_host: gitlab.rtuitlab.dev:5050
+    docker_image_name: depot/front
+    service_update_url: $(SERVICE-UPDATE-DEV-URL)
+    backend_url: $(DEV-BACK-URL)
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
+    deploy_service: true
+    docker_image_tag: latest
+    docker_registry_host: gitlab.rtuitlab.dev:5050
+    docker_image_name: depot/front
+    service_update_url: $(SERVICE-UPDATE-PROD-URL)
+    backend_url: $(PROD-BACK-URL)
+
+stages:
+  # Only build image if no deploy
+  - stage: buildDockerImage
+    condition: not(${{ variables.deploy_service }})
+    displayName: Build Docker image
+    jobs:
+      - job: buildDockerImage
+        displayName: Build Docker image
+        steps:
+          - task: file-creator@6
+            displayName: Create .env file
+            inputs:
+              filepath: '.env'
+              filecontent: |
+                VITE_BASE_URL=${{ variables.backend_url }}
+              endWithNewLine: true
+          - task: Docker@2
+            inputs:
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/${{ variables.docker_file_path }}'
+              buildContext: '$(Build.SourcesDirectory)/${{ variables.docker_build_context }}'
+              tags: |
+                ($Build.BuildId)
+                ${{ variables.docker_image_tag }}
+              addPipelineData: false
+              addBaseImageData: false
+  # Build and push image if deploy
+  - stage: packDockerImages
+    condition: ${{ variables.deploy_service }}
+    displayName: Pack docker images
+    jobs:
+      - job: buildPublicImage
+        displayName: Build public docker image
+        steps:
+          - task: Docker@2
+            displayName: Build image for docker hub
+            inputs:
+              containerRegistry: 'rtuitlab connection by admin'
+              repository: 'rtuitlab/depot-front'
+              command: 'buildAndPush'
+              Dockerfile: '$(Build.SourcesDirectory)/${{ variables.docker_file_path }}'
+              buildContext: '$(Build.SourcesDirectory)/${{ variables.docker_build_context }}'
+              tags: |
+                $(Build.BuildId)
+                ${{ variables.docker_image_tag }}
+      - job: buildPrivateImage
+        displayName: Build private docker image
+        steps:
+          - script: |
+              docker build \
+                --no-cache \
+                --label com.azure.dev.image.build.buildnumber=$(Build.BuildNumber) \
+                --file ${{ variables.docker_file_path }} \
+                --tag ${{ variables.docker_registry_host }}/${{ variables.docker_image_name }}:${{ variables.docker_image_tag }} \
+                --tag ${{ variables.docker_registry_host }}/${{ variables.docker_image_name }}:$(Build.BuildId) \
+                ${{ variables.docker_build_context }}
+            displayName: Docker build image
+          - script: echo $(REGISTRY-PASSWORD) | docker login --username $(REGISTRY-USER) --password-stdin ${{ variables.docker_registry_host }}
+            displayName: Docker login
+          - script: docker push --all-tags ${{ variables.docker_registry_host }}/${{ variables.docker_image_name }}
+            displayName: Docker push image
+          - script: docker logout ${{ variables.docker_registry_host }}
+            displayName: Docker logout
+  - stage: updateService
+    condition: ${{ variables.deploy_service }}
+    dependsOn: packDockerImages
+    displayName: Update Service
+    jobs:
+      - job: updateService
+        displayName: Update Service
+        steps:
+          - script: curl -X POST ${{ variables.service_update_url }}
+            displayName: Update Service

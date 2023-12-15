@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  depot-front:
+    build:
+      dockerfile: deploy/Dockerfile
+      context: ..
+    ports:
+      - 44563:44563

@@ -1,0 +1,28 @@
+.asideTitle {
+  margin-top: 34px;
+  margin-bottom: 22px !important;
+}
+
+.selectsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.select {
+  width: 71%;
+  &Block {
+    display: flex;
+    justify-content: space-between;
+  }
+}
+
+.buttonsContainer {
+  width: 100%;
+  text-align: end;
+  margin-top: 24px;
+}
+
+.buttonPrimary {
+  margin-left: 16px;
+}

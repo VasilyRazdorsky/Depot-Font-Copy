@@ -1,0 +1,5 @@
+:44563 {
+    try_files {path} /
+    root * /depot-front
+    file_server
+}

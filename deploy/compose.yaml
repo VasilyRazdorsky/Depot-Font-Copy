@@ -1,0 +1,5 @@
+version: '3.8'
+
+services:
+  depot-front:
+    image: rtuitlab/depot-front

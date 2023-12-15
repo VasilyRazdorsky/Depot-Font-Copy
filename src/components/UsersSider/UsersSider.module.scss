@@ -1,0 +1,16 @@
+.sideForm {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  &Input {
+    margin-top: 8px;
+  }
+
+  &SubmitButton {
+    width: fit-content;
+    margin-left: auto;
+    margin-top: 4px;
+  }
+}
